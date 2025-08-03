@@ -36,38 +36,44 @@ def main():
     fps_placeholder = st.empty()
     
     cap = cv2.VideoCapture(0)
-    
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer lag
+
     try:
         while True:
             start_time = time.time()
-            
+
             ret, frame = cap.read()
             if not ret:
                 st.error("Failed to capture video frame")
                 break
-                
-            # Run detection
-            detections = st.session_state.detector.detect(frame)
-            
-            # Draw detections
+
+            # Efficient preprocessing: convert only once
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # If your detector expects RGB numpy array, pass frame_rgb directly
+            # If it expects a tensor, convert here:
+            # frame_tensor = torch.from_numpy(frame_rgb).permute(2, 0, 1).float() / 255.0
+
+            # Run detection (ensure detect() is optimized for numpy input)
+            detections = st.session_state.detector.detect(frame_rgb)
+
+            # Draw detections (on frame_rgb for display)
             for box, score, label in zip(detections["boxes"], detections["scores"], detections["labels"]):
                 if score > 0.2:
                     x1, y1, x2, y2 = map(int, box.tolist())
                     label_text = st.session_state.detector.prompts[label]
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(frame, f"{label_text} {score:.2f}", (x1, y1-10),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            
-            # Convert BGR to RGB for display
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # Display the frame
-            frame_placeholder.image(frame_rgb, channels="RGB")
-            
+                    cv2.rectangle(frame_rgb, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(frame_rgb, f"{label_text} {score:.2f}", (x1, y1-10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            # Display the frame (avoid PIL conversion, use numpy directly)
+            frame_placeholder.image(frame_rgb, channels="RGB", use_column_width=True)
+
             # Calculate and display FPS
             fps = 1.0 / (time.time() - start_time)
             fps_placeholder.text(f"FPS: {fps:.1f}")
-            
+
+            # Optional: break after some time or add a stop button in UI
+
     except Exception as e:
         st.error(f"Error: {str(e)}")
     finally:
