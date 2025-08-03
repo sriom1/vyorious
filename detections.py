@@ -68,10 +68,16 @@ class ObjectDetector:
                 f.seek(0)
                 json.dump(data, f, indent=2)
 
-    def detect(self, frame):
-        original_size = frame.shape[1], frame.shape[0]  # (width, height)
-        resized_frame = cv2.resize(frame, self.input_size)
-        image = Image.fromarray(cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB))
+    def detect(self, frame_rgb):
+        """
+        frame_rgb: numpy array in RGB format (height, width, 3)
+        """
+        original_size = frame_rgb.shape[1], frame_rgb.shape[0]  # (width, height)
+        # Efficient resizing using numpy
+        resized_frame = cv2.resize(frame_rgb, self.input_size)
+        # Convert to PIL only once, and only if needed by processor
+        image = Image.fromarray(resized_frame)
+
         inputs = self.processor(text=self.prompts, images=image, return_tensors="pt").to(self.device)
 
         with torch.no_grad():
